@@ -38,54 +38,83 @@ interface loopback100
 -	Issue --help flag to script for additional input details
 
 # Examples
-#### Run device file containing all details (username/password/secret included in device file) ####
+<pre>
+#################################################################################################################
+#### Run device file containing all details (username/password/secret included in device file)
+#################################################################################################################
 
-`py -3 config_runnner.py --list_device devices.log`
+py -3 config_runnner.py --list_device devices.log
 
-**Note:** Expects password in device file. Where security is a concern leave the login details out and the script will dynamically prompt for this information.
+Note: Expects password in device file. Where security is a concern leave the login details out and the script will dynamically prompt for this information.
 
-#### Run device file and a dynamic set of credentials (username/password/secret excluded from provided file) ####
+#################################################################################################################
+#### Run device file and a dynamic set of credentials (username/password/secret excluded from provided file)
+#################################################################################################################
 
-`py -3 config_runnner.py --list_device devices.log --login`
+py -3 config_runnner.py --list_device devices.log --login
 
-**Note:** You will be prompted for a single account prior to threads initiating
+Note: You will be prompted for a single account prior to threads initiating
 
+#################################################################################################################
+#### Run a device file with command directly in the cli (only single command supported)
+#################################################################################################################
+ 
+py -3 config_runnner.py --list_device devices.log --command "show run"
 
-#### Run a device file with command directly in the cli (only single command supported) ####
-`py -3 config_runnner.py --list_device devices.log --command "show run"`
+py -3 config_runnner.py --list_device devices.log --command "show version"
 
-`py -3 config_runnner.py --list_device devices.log --command "show version"`
+py -3 config_runnner.py --list_device devices.log --command "show inventory"
 
-`py -3 config_runnner.py --list_device devices.log --command "show inventory"`
+Note: Useful for a quick ‘show run’ or ‘show inv’ across several devices
 
-**Note:** Useful for a quick ‘show run’ or ‘show inv’ across several devices
+#################################################################################################################
+#### Run a command file across a single device
+#################################################################################################################
+ 
+ py -3 config_runnner.py --device 172.16.224.2 --list_command show_commands.log
 
-#### Run a command file across a single device ####
-`py -3 config_runnner.py --device 172.16.224.2 --list_command show_commands.log`
+#################################################################################################################
+#### Run a single command to a single device (all on CLI)
+#################################################################################################################
 
-#### Run a single command to a single device (all on CLI) ####
-`py -3 config --device 172.16.224.2 --command “show run”`
+ py -3 config --device 172.16.224.2 --command “show run”
+ 
+#################################################################################################################
+#### Enable verbose logging
+#################################################################################################################
 
-#### Enable verbose logging ####
-`py -3 config --device 172.16.224.2 --command “show run” --verbose`
+ py -3 config --device 172.16.224.2 --command “show run” --verbose
 
-#### Define the output location ####
-`py -3 config_runnner.py --device 172.16.224.2 --list_command show_version.log --output “test-output”`
+#################################################################################################################
+#### Define the output location
+#################################################################################################################
+ 
+py -3 config_runnner.py --device 172.16.224.2 --list_command show_version.log --output “test-output”
 
-`py -3 config_runnner.py --device 172.16.224.2 --list_command show_version.log --output “C:\Users\username\source\repos\config-runnner\config-runnner\test-output\”`
+py -3 config_runnner.py --device 172.16.224.2 --list_command show_version.log --output “C:\Users\username\source\repos\config-runnner\config-runnner\test-output\”
 
-`py -3 config_runnner.py --device 172.16.224.2 --list_command show_version.log --output “../test-output”`
+py -3 config_runnner.py --device 172.16.224.2 --list_command show_version.log --output “../test-output”
 
-**Note:** The default output directory is same directory as script
-&nbsp;&nbsp;
-#### Change number of threads (scales to x100) ####
-`py -3 config_runnner.py --list_device devices.log --thread 100`
+Note:
+The default output directory is same directory as script
 
-**Note:** Default threads = x10
+#################################################################################################################
+#### Change number of threads (scales to x100)
+#################################################################################################################
+ 
+py -3 config_runnner.py --list_device devices.log --thread 100
 
-#### Save configuration across a device or group of devices ####
-`py -3 config_runnner.py --device 1.1.1.1 --save`
+Note: 
+Default threads = x10
 
-`py -3 config_runnner.py --list_device --save`
+#################################################################################################################
+#### Save configuration across a device or group of devices
+#################################################################################################################
+ 
+py -3 config_runnner.py --device 1.1.1.1 --save
 
-**Note:** Useful to save configuration across one or several endpoints
+py -3 config_runnner.py --list_device --save
+
+Note: 
+Useful to save configuration across one or several endpoints
+</pre>
