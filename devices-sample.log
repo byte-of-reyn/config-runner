@@ -1,0 +1,36 @@
+###########################################################################################
+### DEVICE LOAD FILE
+###########################################################################################
+### VALID HEADERS ###
+#####################
+#host: 			Distinguished name (DNS) or IPv4 address of the target host
+#	Mandatory: 	Yes
+#
+#device_type: 	Netmiko declared device type. (Default: cisco_ios)
+#	Mandatory: 	Yes
+#
+#username: 		Username for device access.
+#	Mandatory: 	No
+#
+#password: 		Password for device access.
+#	Mandatory: 	No
+#
+#commands: 		Command file to read from and apply to this host the device.
+#	Mandatory: 	Yes
+#
+#secret:  		Priv15 passphrase.
+#	Mandatory: 	No
+#
+###########################################################################################
+#Notes:			Not recommended to keep passwords/secret permanently in our cleartext file.
+#				This should only be used when differing accounts are used across devices.
+###########################################################################################
+
+##############################
+#### PS Lab Device Backup ####
+##############################
+hostname:1.1.1.1;device_type:cisco_ios;username:;password:;secret:;commands:commands-sample.log
+hostname:1.1.1.2;device_type:cisco_ios;username:;password:;secret:;commands:commands-sample.log
+hostname:1.1.1.3;device_type:cisco_ios;username:;password:;secret:;commands:commands-sample.log
+hostname:1.1.1.4;device_type:cisco_ios;username:;password:;secret:;commands:commands-sample.log
+##############################

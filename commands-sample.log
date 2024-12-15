@@ -1,0 +1,18 @@
+
+!read_block
+! Lets check our current L3 interfaces
+sho ip int brief
+!read_block
+
+!write_block
+interface loop100
+ desc This is some test configuration
+ no shut
+!write_block
+
+!read_block
+! Re-check L3 interfaces after the configuration push
+sho ip int brief
+!read_block
+
+!save
