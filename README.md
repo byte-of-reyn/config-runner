@@ -1,5 +1,5 @@
 # config-runner
-Script used to push out commands (single or a batch) to defined network device/s, capture all the received output and save the output to individual log files.
+Script used to push out commands (single or a batch) across network devices, capture received output, and save output to individual log files.
 
 # Use Case
 Run commands (single or a batch) out to specified network devices.
