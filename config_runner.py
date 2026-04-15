@@ -1,9 +1,6 @@
 #!/usr/bin/python3
 #config_runner.py : CLI tool used to push out configuration/commands to network devices
 
-__author__ = 'allen.reyn'
-__version__ = '0.40'
-
 from datetime import datetime
 from getpass import getpass
 from queue import Queue
@@ -24,8 +21,8 @@ import time
 import validators
 import traceback
 
-VERSION = '0.40'
-RELEASE_DATE = '30 Sep 2023'
+VERSION = '0.41'
+RELEASE_DATE = '30 Jan 2025'
 AUTHOR = 'areyn'
 
 DEVICE_TYPE = 1
@@ -504,6 +501,7 @@ def connector(id, results, thread_log, log_lock, queue):
                             tempOutput += "\n"
                             feedback = conn.send_command_expect(cmd, delay_factor=4)
                             tempOutput += feedback
+                            tempOutput += "\n"
                             if "Invalid input" in feedback or "Unknown command" in feedback:
                                 msg = "Error issuing command '{}'. Please check command synxtax and platform support.".format(cmd)
                                 if verbose:
