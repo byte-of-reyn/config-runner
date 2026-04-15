@@ -2,16 +2,14 @@
 #config_runner.py : CLI tool used to push out configuration/commands to network devices
 
 from datetime import datetime
-from getpass import getpass
 from queue import Queue
-from ping3 import ping, verbose_ping
+from ping3 import ping
 from netmiko import ConnectHandler, NetMikoAuthenticationException, NetMikoTimeoutException
 from threading import Lock
 
 import threading
 import getpass
 import argparse
-import requests
 import sys
 import os.path
 import signal
@@ -54,8 +52,7 @@ class Device():
     username = ''
     password = ''
     secret = ''
-    commands = []
-    
+
     def __init__(self, name, user, password, secret, device_type, commands):
         self.hostname = name
         self.username = user
@@ -97,7 +94,7 @@ class Device():
         required_items = 5
         if re.match(contains_data, self.hostname):
             min_config += 1
-        if re.match(contains_data, str(self.commands[0])):
+        if self.commands and re.match(contains_data, str(self.commands[0])):
             min_config += 1
         if re.match(contains_data, self.username):
             min_config += 1
@@ -126,10 +123,9 @@ def append_datetime(string):
 def read_file(filename):
     tempArr = []
     try:
-        file = open(filename, "r")
-        for line in file:
-            tempArr.append(clean_input(line))
-        file.close()
+        with open(filename, "r") as file:
+            for line in file:
+                tempArr.append(clean_input(line))
     except Exception as err:
         print('Error reading input file {}.\n'.format(filename))
     return tempArr
@@ -137,36 +133,31 @@ def read_file(filename):
 #writes string to output file
 def write_file(string, outputName):
     try:
-        file = open(outputName, "w")
-        file.write(string)
-        file.close()
+        with open(outputName, "w") as file:
+            file.write(string)
     except Exception as err:
         print('Error writing file.\n', err)
 
 #writes array to output file
 def write_file_array(array, outputName):
     try:
-        file = open(outputName, "w")
-        for entry in array:
-            file.write(entry)
-            file.write("\n")
-        file.close()
+        with open(outputName, "w") as file:
+            for entry in array:
+                file.write(entry)
+                file.write("\n")
     except Exception as err:
         print('Error writing file.\n', err)
 
 #checks if file is valid
 def is_valid_file(file):
-    valid = None
-    if os.path.isfile(file):
-        valid = True
-    return valid
+    return os.path.isfile(file)
 
 #checks for a valid cisco command
 def check_cisco_command(cmd):
     illegal_char = re.compile(r'([@#$%^&*()<>?\'"{[}\]|\\`~]+)')
     empty = r'^\s*$'
     is_empty = re.match(empty, cmd)
-    is_illegal = re.match(illegal_char, cmd)
+    is_illegal = re.search(illegal_char, cmd)
     if is_empty or is_illegal:
         return False
     else:
@@ -187,14 +178,12 @@ def get_account():
     account['password'] = getpass.getpass(prompt='Password: ', stream=None)
     while re.match(empty, account['password']) or account['password'] == '':
         account['password'] = getpass.getpass(prompt='Password: ', stream=None)
-    print('\nINFO: Leave secret blank to run commands in the default priviledge-level.')
+    print('\nINFO: Leave secret blank to run commands in the default privilege-level.')
     account['secret'] = getpass.getpass(prompt='Secret: ', stream=None)
     return account
 
 #parses arguments provided by the user
 def parse_args(log_file):
-    valid_ipv4 = re.compile(r'^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$')
-    valid_thread_no = re.compile(r'^[0-9]+\s*$')
     cli_command = False
     
     #setup parser
@@ -204,7 +193,7 @@ def parse_args(log_file):
     parser.add_argument('--device', required=False, help='Hostname or IP address of device commands will be run on.')
     parser.add_argument('--command', required=False, help='Commands which will be run across the device listing')
     parser.add_argument('--output', required=False, help='Directory for results output location. Default is the same directory as the script.')
-    parser.add_argument('--threads', required=False, help='Number of threads to utilise as part of capture activities. The default is 10.')
+    parser.add_argument('--threads', required=False, type=int, help='Number of threads to utilise as part of capture activities. The default is 10.')
     parser.add_argument('--verbose', required=False, action='store_true', help='Verbose logging output.')
     parser.add_argument('--save', required=False, action='store_true', help='Only performs a configuration save across devices. Use the save flag via "list_command" file if you want to execute additional commands.')
     parser.add_argument('--login', required=False, action='store_true', help='Asks for dynamic input of device login details. Overrides any accounts provided via device list file.')
@@ -213,26 +202,10 @@ def parse_args(log_file):
     #check for output location existence
     print()
     curr_dir = str(os.getcwd())
-    if args.output != None:
-        win_dir = re.compile(r'[a-zA-Z]:\\((?:.*?\\)*).*')
-        same_dir_folder = re.compile(r'^\.\.\\.*')
-        same_dir_folder02 = re.compile(r'^\.\./.*')
-        save_dir = ''
-        if re.match(win_dir, args.output):
-            save_dir = args.output
-        else:
-            #..\\ type input provided via args
-            if re.match(same_dir_folder, args.output) or re.match(same_dir_folder02, args.output) :
-                save_dir = args.output.replace('.', '')
-                save_dir = save_dir.replace('/', '')
-                save_dir = save_dir.replace('\\', '')
-                save_dir = curr_dir + '\\' + save_dir
-            #assume only folder name provided - create new folder in same dir as script
-            else:
-                save_dir = curr_dir + '\\' + args.output
-    #no output directory provided
+    if args.output is not None:
+        save_dir = os.path.abspath(args.output)
     else:
-        save_dir = curr_dir + '\\' + 'config-runner-logs'
+        save_dir = os.path.join(curr_dir, 'config-runner-logs')
 
     #check if save directory exists - create if required
     if not os.path.exists(save_dir):
@@ -261,8 +234,7 @@ def parse_args(log_file):
     #check validity of provided host via args
     else:
         if args.device:
-            valid_dn = str(validators.domain(args.device))
-            if valid_dn:   
+            if validators.domain(args.device) or validators.ipv4(args.device):
                 print('Host: {}'.format(args.device))
             else:
                 print('Not a valid host.')
@@ -273,24 +245,18 @@ def parse_args(log_file):
             sys.exit(1) 
 
     #check provided thread count is valid
-    if args.threads:
-        threads = re.match(valid_thread_no, args.threads)
-        if threads:
-            if int(args.threads) <= max_threads:
-                msg = 'Execution threads: x{}'.format(str(args.threads))
-                print(msg)
-                log_file.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"SYSTEM", "INFO", "--", msg))
-            else:
-                print('Thread count x{} exceeds maximum of x100.'.format(args.threads))
-                print('Exiting program.')
-                sys.exit(1)
+    if args.threads is not None:
+        if 1 <= args.threads <= max_threads:
+            msg = 'Execution threads: x{}'.format(args.threads)
+            print(msg)
+            log_file.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"SYSTEM", "INFO", "--", msg))
         else:
-            print('Thread count is not a valid integer.')
+            print('Thread count x{} exceeds maximum of x{}.'.format(args.threads, max_threads))
             print('Exiting program.')
             sys.exit(1)
     else:
         args.threads = 10
-        msg = 'Execution threads: x{}'.format(str(args.threads))
+        msg = 'Execution threads: x{}'.format(args.threads)
         print(msg)
         log_file.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"SYSTEM", "INFO", "--", msg))
 
@@ -316,9 +282,9 @@ def parse_args(log_file):
 #parse device commands
 def parse_commands(cmd_list):
     cmd_blocks = []
-    read_block = re.compile(r'^!read_block[/s]*.*')
-    write_block = re.compile(r'^!write_block[/s]*.*')
-    save_flag = re.compile(r'^!save[/s]*.*')
+    read_block = re.compile(r'^!read_block[\s]*.*')
+    write_block = re.compile(r'^!write_block[\s]*.*')
+    save_flag = re.compile(r'^!save[\s]*.*')
     
     #search for block start
     temp_cmds = []
@@ -499,13 +465,13 @@ def connector(id, results, thread_log, log_lock, queue):
                             tempOutput += prompt
                             tempOutput += cmd
                             tempOutput += "\n"
-                            feedback = conn.send_command_expect(cmd, delay_factor=4)
+                            feedback = conn.send_command(cmd, read_timeout=60)
                             tempOutput += feedback
                             tempOutput += "\n"
                             if "Invalid input" in feedback or "Unknown command" in feedback:
-                                msg = "Error issuing command '{}'. Please check command synxtax and platform support.".format(cmd)
+                                msg = "Error issuing command '{}'. Please check command syntax and platform support.".format(cmd)
                                 if verbose:
-                                    print("Thread ID{}: ERROR: {} to host '{}' [Invalid command or priviledge issue].".format(id, msg, device['host']))  
+                                    print("Thread ID{}: ERROR: {} to host '{}' [Invalid command or privilege issue].".format(id, msg, device['host']))  
                                 with log_lock:
                                     thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(), "ID"+str(id), "ERROR", device['host'], msg))
                         output += tempOutput
@@ -521,7 +487,7 @@ def connector(id, results, thread_log, log_lock, queue):
                         tempOutput += feedback 
                         tempOutput += "\n"
                         if "Invalid input" in feedback or "Unknown command" in feedback:
-                            msg = "Error issuing command block to host. Please check command synxtax and platform support."
+                            msg = "Error issuing command block to host. Please check command syntax and platform support."
                             if verbose:
                                 print("Thread ID{}: ERROR: {} to host '{}'.\n{}".format(id, msg, device['host'], block[BLOCK_CLI]))
                             with log_lock:
@@ -541,7 +507,7 @@ def connector(id, results, thread_log, log_lock, queue):
                             thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(), "ID"+str(id), "INFO", device['host'], msg))
 
                 #each thread writes to a different file - write-lock not required
-                output_file = device['output_dir'] + '\\' + append_datetime(device_dict['host']) + '.log'
+                output_file = os.path.join(device['output_dir'], append_datetime(device_dict['host']) + '.log')
                 write_file(output, output_file)
 
                 with print_lock:
@@ -552,7 +518,8 @@ def connector(id, results, thread_log, log_lock, queue):
                         thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"ID"+str(id), "INFO", device['host'], msg))
 
                 output_file = "" #reset output file location
-                success_count += 1 #increment thread success count
+                with log_lock:
+                    success_count += 1 #increment thread success count
                 results[device_dict['host']] = ("Success", id, "Thread successfully completed.") #update thread result for host
                 msg = "Thread tasks have been successfully completed"
                 with log_lock:
@@ -568,22 +535,22 @@ def connector(id, results, thread_log, log_lock, queue):
                     with print_lock:
                         print(temp_output)
                 queue.task_done()
-                fail_count += 1 #increment thread fail count
-                results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
                 with log_lock:
+                    fail_count += 1 #increment thread fail count
                     thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"ID"+str(id), "ERROR", device['host'], temp_status))
+                results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
                 continue
             except NetMikoAuthenticationException:
                 temp_status = "Netmiko Authentication Exception [Provided credentials are invalid or incorrect]"
                 if verbose:
                     temp_output = "Thread ID{}: ERROR: Netmiko authentication error for host '{}'.".format(id, device['host'])
                     with print_lock:
-                         print(temp_output)
+                        print(temp_output)
                 queue.task_done()
-                fail_count += 1 #increment thread fail count
-                results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
                 with log_lock:
+                    fail_count += 1 #increment thread fail count
                     thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"ID"+str(id), "ERROR", device['host'], temp_status))
+                results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
             except IOError:
                 temp_status = "Netmiko IOError Exception [Thread failed during command send process]"
                 if verbose:
@@ -593,36 +560,33 @@ def connector(id, results, thread_log, log_lock, queue):
                         print(temp_output)
                         print(temp_output_02)
                 queue.task_done()
-                fail_count += 1 #increment thread fail count
-                results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
                 with log_lock:
+                    fail_count += 1 #increment thread fail count
                     thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"ID"+str(id), "ERROR", device['host'], temp_status))
+                results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
             except Exception as err:
-                temp_status = "General Exception [Unknown error occured during thread execution]"
+                temp_status = "General Exception [Unknown error occurred during thread execution]"
+                temp_output = "Thread ID{}: ERROR: General exception occurred for host '{}'.".format(id, device['host'])
                 if verbose:
-                    temp_output = "Thread ID{}: ERROR: General exception occured for host '{}'.".format(id, device['host'])
-                with print_lock:
-                    print(temp_output)
+                    with print_lock:
+                        print(temp_output)
                 queue.task_done()
-                fail_count += 1 #increment thread fail count
-                results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
                 with log_lock:
+                    fail_count += 1 #increment thread fail count
                     thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"ID"+str(id), "ERROR", device['host'], temp_status))
+                results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
 
     except Exception as err:
-        temp_status = "General Exception [Unknown error occured during thread execution]"
+        temp_status = "General Exception [Unknown error occurred during thread execution]"
+        temp_output = "Thread ID{}: ERROR: General exception occurred for host '{}'.".format(id, device['host'])
         if verbose:
-            temp_output = "Thread ID{}: ERROR: General exception occured for host '{}'.".format(id, device['host'])
             with print_lock:
                 print(temp_output)
         queue.task_done()
-        fail_count += 1 #increment thread fail count
-        results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
         with log_lock:
+            fail_count += 1 #increment thread fail count
             thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"ID"+str(id), "ERROR", device['host'], temp_status))
-
-    #task completed
-    queue.task_done()
+        results[device_dict['host']] = ("Fail", id, temp_status) #update thread result for host
 
 def main():
     #regex
@@ -871,7 +835,7 @@ def main():
         dev_count = len(devices.items())
         if dev_count < thread_count:
             thread_count = dev_count
-            msg = 'Defined thread count [{}] exceeeds total devices [{}]. Adjusting thread count to match.'.format(thread_count, dev_count)
+            msg = 'Defined thread count [{}] exceeds total devices [{}]. Adjusting thread count to match.'.format(thread_count, dev_count)
             if verbose:
                 print("\nINFO: {}".format(msg))
             thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"SYSTEM", "INFO", "--", msg))
@@ -932,7 +896,7 @@ def main():
         thread_log.append('"{}","{}","{}","{}","{}"'.format(datetime.now(),"SYSTEM", "INFO", "--", msg))
         
         #output log file
-        output_file = args.output + '\\' + append_datetime("cfgRun_execStatus") + '.csv'
+        output_file = os.path.join(args.output, append_datetime("cfgRun_execStatus") + '.csv')
         write_file_array(thread_log, output_file)
         
     except KeyboardInterrupt:
